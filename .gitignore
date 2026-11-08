@@ -1,0 +1,19 @@
+# SQLite database files
+payroll.db
+*.db
+*.sqlite
+*.sqlite3
+
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Environment / IDE
+.env
+.venv
+env/
+venv/
+.vscode/
+.idea/
