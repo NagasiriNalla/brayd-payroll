@@ -25,9 +25,9 @@ Query 2 flags all employees whose October 2026 net pay is below 75% of their mon
    - **Assessment**: **CORRECT (Expected behavior)**.
    - **Reason**: Arjun joined the company mid-month on **October 13, 2026**. Per Brayd rules, all days prior to `join_date` are ignored, and Sundays are only paid if on or after the join date. In October, Arjun was employed for only 19 calendar days (17 full days worked + 2 Sundays on/after join date = 19 paid days). His prorated base pay (19/31 of gross) plus 8 minutes of overtime yields ₹17,123, which is legitimately ~61.37% of gross.
 
-2. **Fatima Begum (`E04`) — Gross: ₹18,600 | Net: ₹9,300 (50.00%)**
-   - **Assessment**: **BUG (Flaw in Brayd's attendance specification)**.
-   - **Reason**: Fatima was scheduled for the night shift starting at `22:00 IST`. She regularly attended all shifts, clocking in around 21:55 and clocking out around 06:05 the next morning. However, Brayd's rules partition events strictly by calendar date rather than shift window. On each working calendar day, her morning OUT precedes her evening IN, producing negative worked minutes and classifying full shifts as half days. Furthermore, her Monday shifts lack a preceding morning OUT, triggering false `MISSING_PUNCH` absences. This low pay is an artifact of the calendar-day rule failing for night shifts.
+2. **Fatima Begum (`E04`) — Gross: ₹18,600 | Net: ₹18,600 (100.00%)**
+   - **Assessment**: **CORRECT after fix — was a bug, now resolved**.
+   - **Reason**: Fatima works the 22:00 night shift, clocking in around 21:55 and out around 06:05 the next morning. Naive calendar-date partitioning placed her morning OUT and evening IN on the same day, producing negative worked minutes and false `MISSING_PUNCH` flags, cutting her pay to ₹9,300. This was fixed by implementing `get_shift_date()`: for overnight shifts (`shift_start_ist >= 12:00`), punches before noon are attributed to the previous evening's shift date. After the fix, E04 correctly receives 31 paid days and full ₹18,600 net pay, so she no longer appears in Query 2.
 
 ---
 
@@ -58,11 +58,11 @@ Query 2 flags all employees whose October 2026 net pay is below 75% of their mon
 
 ## 5. What I Would Change With One More Day
 
-1. **Shift-Aware Punch Pairing (Overnight Shift Support)**:
-   - Instead of partitioning events by raw calendar date, group events into shift windows defined by `shift_start_ist` (e.g., matching IN punches around 22:00 with OUT punches around 06:00 next morning). This would properly pay night shift workers like Fatima Begum.
-2. **CSV / JSON Export CLI Flag**:
-   - Add a `--format=json` or `--format=csv` option to `payroll.py run` to export monthly payroll summaries for finance and banking integration.
-3. **Audit Log Table**:
-   - Add an `audit_log` table recording timestamps, operator IDs, lock events, and retroactive adjustments whenever payroll recalculations or lock operations occur.
-4. **Data Integrity Pre-Flight Checks**:
-   - Add an automated anomaly detector that scans for impossible punch pairs (e.g., IN after IN without OUT, interval < 10 mins) and exports an exception report for HR before monthly lock.
+1. **Automated Anomaly Detector (Pre-Flight Data Integrity)**:
+   - Add a pre-lock validation pass that scans `clock_events` for impossible punch patterns: consecutive IN-IN or OUT-OUT without a matching counterpart, or IN/OUT pairs separated by less than 10 minutes (almost certainly a device glitch). Currently these pass through silently. The detector would produce a named exception report for HR review before `payroll.py lock` is allowed to proceed.
+2. **Audit Log Table**:
+   - Add an `audit_log` table recording timestamp, operator identity, action type (`LOAD`, `RUN`, `LOCK`, `LATE`, `ARREARS`), affected employee, and old/new values whenever any payroll state changes. This makes it easy to reconstruct exactly who changed what and when — critical for any finance tool.
+3. **CSV / JSON Export CLI Flag**:
+   - Add a `--format=json` or `--format=csv` option to `payroll.py payslip` and `payroll.py run` to export payroll summaries for direct import into banking or accounting systems.
+4. **Configurable Late-Grace Window per Employee**:
+   - The 10-minute late threshold is currently a hard-coded constant. Storing it per-employee (or per-site) in the database would let HR grant individual grace periods without code changes — a common real-world payroll requirement.
