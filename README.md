@@ -196,17 +196,17 @@ Daily Rate       : ₹600.00  (31 days)
 Hourly Rate      : ₹75.00
 ----------------------------------------------------------------
 ATTENDANCE SUMMARY:
-  Paid Days      : 15.5
+  Paid Days      : 31.0
   Late Days      : 1
   Overtime       : 0 minutes
-  Flags          : 2026-10-01: NEGATIVE_WORKED_MINUTES (-952m, OUT precedes IN); 2026-10-02: NEGATIVE_WORKED_MINUTES (-954m, OUT precedes IN); 2026-10-03: NEGATIVE_WORKED_MINUTES (-941m, OUT precedes IN); 2026-10-05: MISSING_PUNCH (IN only); 2026-10-06: NEGATIVE_WORKED_MINUTES (-941m, OUT precedes IN); 2026-10-07: NEGATIVE_WORKED_MINUTES (-936m, OUT precedes IN); 2026-10-08: NEGATIVE_WORKED_MINUTES (-976m, OUT precedes IN); 2026-10-09: NEGATIVE_WORKED_MINUTES (-920m, OUT precedes IN); 2026-10-10: NEGATIVE_WORKED_MINUTES (-950m, OUT precedes IN); 2026-10-12: MISSING_PUNCH (IN only); 2026-10-13: NEGATIVE_WORKED_MINUTES (-958m, OUT precedes IN); 2026-10-14: NEGATIVE_WORKED_MINUTES (-952m, OUT precedes IN); 2026-10-15: NEGATIVE_WORKED_MINUTES (-943m, OUT precedes IN); 2026-10-16: NEGATIVE_WORKED_MINUTES (-953m, OUT precedes IN); 2026-10-17: NEGATIVE_WORKED_MINUTES (-950m, OUT precedes IN); 2026-10-19: MISSING_PUNCH (IN only); 2026-10-20: NEGATIVE_WORKED_MINUTES (-949m, OUT precedes IN); 2026-10-21: NEGATIVE_WORKED_MINUTES (-957m, OUT precedes IN); 2026-10-22: NEGATIVE_WORKED_MINUTES (-946m, OUT precedes IN); 2026-10-23: NEGATIVE_WORKED_MINUTES (-937m, OUT precedes IN); 2026-10-24: NEGATIVE_WORKED_MINUTES (-967m, OUT precedes IN); 2026-10-26: MISSING_PUNCH (IN only); 2026-10-27: NEGATIVE_WORKED_MINUTES (-950m, OUT precedes IN); 2026-10-28: NEGATIVE_WORKED_MINUTES (-933m, OUT precedes IN); 2026-10-29: NEGATIVE_WORKED_MINUTES (-955m, OUT precedes IN); 2026-10-30: NEGATIVE_WORKED_MINUTES (-948m, OUT precedes IN); 2026-10-31: NEGATIVE_WORKED_MINUTES (-959m, OUT precedes IN)
+  Flags          : None
 ----------------------------------------------------------------
 LINE ITEMS:
-  BASE_PAY        :  ₹  9300.00  (Base Pay (15.5 paid days @ ₹600.00/day))
+  BASE_PAY        :  ₹ 18600.00  (Base Pay (31.0 paid days @ ₹600.00/day))
   OVERTIME        :  ₹     0.00  (Overtime Pay (0 mins @ ₹112.50/hr))
   LATE_DEDUCTION  :  ₹     0.00  (Late Deduction (0.0 days for 1 late days))
 ----------------------------------------------------------------
-NET PAY          :  ₹9,300
+NET PAY          :  ₹18,600
 ================================================================
 ```
 
@@ -247,8 +247,8 @@ Two raw SQL queries are available in `report.sql`:
 
 1. **Total Net Pay per Site**:
    - `Kokapet`: ₹75,710
-   - `Gachibowli`: ₹26,423
+   - `Gachibowli`: ₹35,723
 
 2. **Employees with Net Pay < 75% of Gross**:
-   - `E04` (Fatima Begum): Gross ₹18,600 | Net ₹9,300 (50.00%)
    - `E03` (Arjun Reddy): Gross ₹27,900 | Net ₹17,123 (61.37%)
+   *(Note: Fatima Begum (`E04`) is no longer flagged as her overnight shift is accurately processed, receiving full ₹18,600 net pay).*

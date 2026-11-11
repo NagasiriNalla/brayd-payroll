@@ -54,6 +54,22 @@ def parse_to_ist(ts_str: str) -> datetime:
     return dt.astimezone(IST)
 
 
+def get_shift_date(dt: datetime, shift_h: int) -> date:
+    """
+    Determine the shift date (logical working day) for a punch datetime.
+    For day shifts (shift_h < 12):
+        The shift takes place on dt's calendar date.
+    For overnight shifts (shift_h >= 12, e.g. 22:00 to 06:00):
+        Punches before 12:00 noon belong to the shift that started the previous evening.
+        Punches at or after 12:00 noon belong to the shift starting today.
+    """
+    if shift_h >= 12:
+        if dt.time() < time(12, 0):
+            return dt.date() - timedelta(days=1)
+        return dt.date()
+    return dt.date()
+
+
 def get_connection(db_path: str = DEFAULT_DB_PATH) -> sqlite3.Connection:
     """Open and initialize a connection to the SQLite database."""
     conn = sqlite3.connect(db_path)
@@ -234,13 +250,13 @@ def calculate_employee_month(
     )
     all_events = cursor.fetchall()
 
-    # Partition events by their IST calendar date
+    # Partition events by their shift date (supporting overnight shifts)
     day_events: dict[date, list[tuple[datetime, str, str]]] = {}
     for ev in all_events:
         dt = datetime.fromisoformat(ev["device_time_ist"])
-        if dt.year == year and dt.month == month:
-            d = dt.date()
-            day_events.setdefault(d, []).append((dt, ev["type"], ev["event_id"]))
+        shift_d = get_shift_date(dt, shift_h)
+        if shift_d.year == year and shift_d.month == month:
+            day_events.setdefault(shift_d, []).append((dt, ev["type"], ev["event_id"]))
 
     sundays = 0
     full_days = 0
@@ -297,8 +313,15 @@ def calculate_employee_month(
                 )
 
         # Late day check: earliest IN > 10 mins after shift start, counted only on full or half days
-        shift_dt = earliest_in.replace(
-            hour=shift_h, minute=shift_m, second=0, microsecond=0
+        shift_dt = datetime(
+            cal_date.year,
+            cal_date.month,
+            cal_date.day,
+            shift_h,
+            shift_m,
+            0,
+            0,
+            tzinfo=earliest_in.tzinfo,
         )
         late_diff_minutes = int((earliest_in - shift_dt).total_seconds() // 60)
         if is_worked_day and late_diff_minutes > 10:

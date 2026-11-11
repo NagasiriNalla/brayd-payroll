@@ -4,11 +4,10 @@
 
 Where Brayd's written specifications did not explicitly define an edge condition, the following engineering assumptions were made:
 
-- **Negative Worked Minutes on Overnight Shifts (Fatima Begum / E04)**:
-  - Brayd's rules mandate: *"An event's day is the IST calendar date of its device_time"* and *"Worked minutes = latest OUT − earliest IN"*.
-  - For workers on overnight shifts (e.g., 22:00 to 06:00 IST), the morning clock-out (e.g., 06:05) and evening clock-in (e.g., 21:55) land on the same calendar day. Hence, `latest OUT - earliest IN` evaluates to a negative integer (around -950 minutes).
-  - The specification states: *"240 worked minutes or more is a full day; fewer is a half day."* Because -950 is strictly fewer than 240, this was evaluated as a half day, and an explicit audit flag `NEGATIVE_WORKED_MINUTES (OUT precedes IN)` was logged on each occurrence.
-  - On Mondays following a Sunday off, an IN exists with no morning OUT, triggering `MISSING_PUNCH` (absent) per specification.
+- **Overnight Shifts (Fatima Begum / E04) — Shift-Aware Partitioning**:
+  - Workers on overnight shifts (e.g., 22:00 to 06:00 IST) have clock events that span past midnight into the following calendar morning.
+  - Initially, naive calendar-date partitioning caused the morning clock-out (06:05) and evening clock-in (21:55) to land on the same calendar day, yielding negative worked minutes and falsely downgrading full shifts to half days.
+  - **Resolution**: Implemented shift-aware punch date assignment via `get_shift_date()`. For overnight shifts (`shift_start_ist >= 12:00`), punches before 12:00 noon are attributed to the shift that commenced the previous evening (`date - 1 day`). This correctly pairs evening IN punches with the corresponding next-morning OUT punches, properly handles month-boundary transitions (such as Oct 31st evening to Nov 1st morning), and ensures night-shift workers like Fatima Begum receive their full 31 paid days and ₹18,600 net pay.
 - **Precision and Rounding**:
   - Daily rate (`monthly_gross / 31`) and hourly rate (`daily_rate / 8`) were maintained at full decimal precision (`Decimal`) during intermediate arithmetic.
   - Each individual line item (`Base Pay`, `Overtime Pay`, `Late Deduction`, `Arrears`) is rounded to the nearest paisa (`0.01`, halves round up via `ROUND_HALF_UP`).

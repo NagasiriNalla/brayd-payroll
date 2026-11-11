@@ -24,6 +24,7 @@ from payroll import (
     round_paisa,
     round_rupee,
     parse_to_ist,
+    get_shift_date,
 )
 
 
@@ -298,3 +299,80 @@ def test_attendance_and_pay_rules_unit(memory_db):
 
     # Flags should include MISSING_PUNCH for Oct 13
     assert any("MISSING_PUNCH" in f for f in calc["flags"])
+
+
+def test_fatima_begum_overnight_shift(loaded_db):
+    """
+    Test 6:
+    Verify Fatima Begum (E04) overnight shift payroll is calculated accurately:
+    - 27 night shifts worked + 4 Sundays = 31.0 paid days
+    - Exactly 1 late day (>10m after 22:00 IST), 0 OT minutes, 0 late deduction
+    - Full net pay of ₹18,600 (100% of gross)
+    - Zero audit flags (no false negative worked minutes or missing punch)
+    """
+    month = "2026-10"
+    results = run_payroll(loaded_db, month)
+    e04_calc = [r for r in results if r["employee_id"] == "E04"][0]
+
+    assert e04_calc["paid_days"] == 31.0
+    assert e04_calc["sundays"] == 4
+    assert e04_calc["full_days"] == 27
+    assert e04_calc["half_days"] == 0
+    assert e04_calc["absent_days"] == 0
+    assert e04_calc["late_days"] == 1
+    assert e04_calc["overtime_minutes"] == 0
+    assert e04_calc["net_pay"] == 18600
+    assert e04_calc["flags"] == []
+
+    # Verify database persistence
+    ps = loaded_db.execute(
+        "SELECT * FROM payslips WHERE employee_id = 'E04' AND month = ?", (month,)
+    ).fetchone()
+    assert ps["paid_days"] == 31.0
+    assert ps["late_days"] == 1
+    assert ps["net_pay"] == 18600
+    assert ps["flags"] == ""
+
+
+def test_overnight_shift_month_boundary(memory_db):
+    """
+    Test 7:
+    Verify overnight shift date assignment across month boundaries:
+    - Punch on 2026-10-01 morning OUT (06:05) belongs to 2026-09-30 shift (ignored in Oct)
+    - Shift starting 2026-10-31 night (21:55 IN) ending 2026-11-01 morning (06:10 OUT)
+      belongs to 2026-10-31 shift and is credited to October
+    """
+    memory_db.execute(
+        """
+        INSERT INTO employees (
+            employee_id, name, site, monthly_gross_inr, join_date, shift_start_ist
+        ) VALUES ('T02', 'Night Worker', 'SiteB', 31000.0, '2026-10-01', '22:00')
+        """
+    )
+    emp_row = memory_db.execute("SELECT * FROM employees WHERE employee_id = 'T02'").fetchone()
+
+    # Clock events:
+    # 1. OUT on 2026-10-01 06:05 (from Sep 30 shift)
+    # 2. IN on 2026-10-31 21:55
+    # 3. OUT on 2026-11-01 06:10
+    test_events = [
+        ("ev_sep_out", "T02", "OUT", "2026-10-01T06:05:00+05:30", "2026-10-01T06:05:00+05:30"),
+        ("ev_oct_in", "T02", "IN", "2026-10-31T21:55:00+05:30", "2026-10-31T21:55:00+05:30"),
+        ("ev_nov_out", "T02", "OUT", "2026-11-01T06:10:00+05:30", "2026-11-01T06:10:00+05:30"),
+    ]
+    for eid, emp, typ, dev, dev_ist in test_events:
+        memory_db.execute(
+            """
+            INSERT INTO clock_events (event_id, employee_id, type, device_time, device_time_ist, uploaded_at)
+            VALUES (?, ?, ?, ?, ?, '2026-11-01T12:00:00Z')
+            """,
+            (eid, emp, typ, dev, dev_ist),
+        )
+
+    calc = calculate_employee_month(memory_db, emp_row, 2026, 10)
+    # October has 4 Sundays (Oct 4, 11, 18, 25) + 1 worked day (Oct 31) = 5 paid days
+    assert calc["sundays"] == 4
+    assert calc["full_days"] == 1
+    assert calc["paid_days"] == 5.0
+    assert calc["flags"] == []
+
